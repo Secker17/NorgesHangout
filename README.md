@@ -18,4 +18,7 @@ Merkninger
 - Aktiver "Server Members Intent" i bot-innstillingene i Discord Developer Portal for å få `guildMemberAdd`-event.
 - Kanal-IDene er som du oppga; de ligger også i `.env.example`.
 
+Feilsøking
+- Feilen `Unknown Guild` ved registrering av `/setup` betyr som regel at enten `GUILD_ID` i `.env` er feil, eller at boten ikke er invitert til den guilden. Sjekk at `GUILD_ID` er korrekt og at boten er medlem i serveren. Hvis `GUILD_ID` ikke er satt, forsøker boten å registrere `/setup` i alle guilds den er koblet til.
+
 Kort og rask oppstart — si til hvis du vil ha tillegg som transcript, logs eller slash-kommandoer for å administrere tickets. 🇳🇴
