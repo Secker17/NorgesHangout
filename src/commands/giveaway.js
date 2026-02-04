@@ -6,6 +6,8 @@ function genId() { return `g${Date.now().toString(36)}${Math.floor(Math.random()
 
 export default {
   async execute(interaction) {
+    // Defer tidlig for å unngå "The application did not respond" i Discord
+    await interaction.deferReply({ ephemeral: true });
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'start') {
@@ -23,36 +25,53 @@ export default {
         new ButtonBuilder().setCustomId(`giveaway_end:${gid}`).setLabel('Avslutt (eier/staff)').setStyle(ButtonStyle.Danger)
       );
 
-      const msg = await interaction.channel.send({ embeds: [embed], components: [row] });
+      // Permission check: kan bot sende i denne kanalen?
+      const channel = interaction.channel;
+      const perms = channel.permissionsFor ? channel.permissionsFor(interaction.client.user) : null;
+      if (!perms || !perms.has(PermissionFlagsBits.ViewChannel) || !perms.has(PermissionFlagsBits.SendMessages)) {
+        return interaction.editReply({ content: 'Bot mangler View/Send permissions i denne kanalen. Gi boten tilgang og prøv igjen.' });
+      }
+
+      let msg;
+      try {
+        msg = await channel.send({ embeds: [embed], components: [row] });
+      } catch (err) {
+        console.error('Kunne ikke poste giveaway-melding:', err);
+        return interaction.editReply({ content: 'Kunne ikke poste giveaway-meldingen i kanalen (sjekk rettigheter).' });
+      }
 
       // Persist
-      giveawayStore.set(gid, {
-        id: gid,
-        messageId: msg.id,
-        channelId: msg.channel.id,
-        prize,
-        ownerId: interaction.user.id,
-        participants: []
-      });
+      try {
+        giveawayStore.set(gid, {
+          id: gid,
+          messageId: msg.id,
+          channelId: msg.channel.id,
+          prize,
+          ownerId: interaction.user.id,
+          participants: []
+        });
+      } catch (e) {
+        console.error('Kunne ikke lagre giveaway:', e);
+        return interaction.editReply({ content: 'Giveaway startet, men kunne ikke lagre metadata.' });
+      }
 
-      await interaction.reply({ content: `Giveaway startet med ID **${gid}**.`, ephemeral: true });
+      await interaction.editReply({ content: `Giveaway startet med ID **${gid}**.` });
       return;
     }
 
     if (sub === 'end') {
       const gid = interaction.options.getString('id');
       const g = giveawayStore.get(gid);
-      if (!g) return interaction.reply({ content: 'Fant ikke giveaway med den IDen.', ephemeral: true });
+      if (!g) return interaction.editReply({ content: 'Fant ikke giveaway med den IDen.' });
 
       // Permission: owner or staff or ManageGuild
       const isStaff = (config.STAFF_ROLE_ID && interaction.member.roles?.cache.has(config.STAFF_ROLE_ID));
       const hasPerm = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || isStaff || interaction.user.id === g.ownerId;
-      if (!hasPerm) return interaction.reply({ content: 'Du har ikke rettigheter til å avslutte denne giveawayen.', ephemeral: true });
+      if (!hasPerm) return interaction.editReply({ content: 'Du har ikke rettigheter til å avslutte denne giveawayen.' });
 
       const participants = g.participants || [];
       if (!participants.length) {
-        await interaction.reply({ content: 'Ingen deltakere i denne giveawayen.', ephemeral: true });
-        return;
+        return interaction.editReply({ content: 'Ingen deltakere i denne giveawayen.' });
       }
 
       const winnerId = participants[Math.floor(Math.random()*participants.length)];
@@ -71,10 +90,11 @@ export default {
         }
       } catch (_) {}
 
-      await interaction.reply({ content: `Vinner valgt: ${winnerMention}`, ephemeral: true });
+      await interaction.editReply({ content: `Vinner valgt: ${winnerMention}` });
       return;
     }
   },
+
   register(builder) {
     builder
       .setName('giveaway')

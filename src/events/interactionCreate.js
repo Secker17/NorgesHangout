@@ -18,6 +18,18 @@ export default function (client) {
           }
           return;
         }
+
+        if (interaction.commandName === 'giveaway') {
+          // Giveaway command: forward to handler
+          try {
+            const { default: giveaway } = await import('../commands/giveaway.js');
+            await giveaway.execute(interaction);
+          } catch (e) {
+            console.error('Error executing giveaway command:', e);
+            try { await interaction.reply({ content: 'En feil oppstod ved behandling av giveaway.', ephemeral: true }); } catch (_) {}
+          }
+          return;
+        }
       }
 
       if (interaction.isButton()) {
